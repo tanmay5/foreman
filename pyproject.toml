@@ -1,0 +1,96 @@
+[project]
+name = "foreman"
+version = "0.0.1"
+description = "Personal engineering chief-of-staff. Synthesizes signals across GitHub, Jira, and Slack into a daily briefing that learns your patterns and tells you what actually matters."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Tanmay Shah" }]
+keywords = ["agents", "engineering-productivity", "ai", "developer-tools", "cli"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development",
+    "Topic :: Utilities",
+]
+
+dependencies = [
+    # LLM
+    "anthropic>=0.40.0",
+    # HTTP
+    "httpx>=0.27.0",
+    # Config + validation
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.3.0",
+    # Terminal UX
+    "rich>=13.7.0",
+    "typer>=0.12.0",
+    # Scheduling
+    "apscheduler>=3.10.0",
+    # Cross-platform paths
+    "platformdirs>=4.2.0",
+    # Async helpers
+    "anyio>=4.4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-mock>=3.14.0",
+    "ruff>=0.5.0",
+    "mypy>=1.10.0",
+]
+
+[project.scripts]
+foreman = "foreman.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/tanmayshah96/foreman"
+Repository = "https://github.com/tanmayshah96/foreman"
+Issues = "https://github.com/tanmayshah96/foreman/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["foreman"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "A",   # flake8-builtins
+    "C4",  # flake8-comprehensions
+    "RET", # flake8-return
+    "SIM", # flake8-simplify
+    "TCH", # flake8-type-checking
+]
+ignore = ["E501"]  # line length handled by formatter
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

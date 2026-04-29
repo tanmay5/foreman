@@ -43,7 +43,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the full design.
 pip install foreman
 
 # Or from source
-git clone https://github.com/tanmayshah96/foreman.git
+git clone https://github.com/tanmay5/foreman.git
 cd foreman
 uv sync
 cp .env.example .env  # fill in tokens

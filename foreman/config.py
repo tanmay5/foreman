@@ -2,6 +2,9 @@
 
 All secrets, hostnames, and tunables flow through this module. No other
 file in Foreman is allowed to read os.environ directly.
+
+For v0.1 only GITHUB_TOKEN and GITHUB_USER are required. Anthropic /
+Jira / Slack become required when their respective features ship.
 """
 
 from __future__ import annotations
@@ -17,26 +20,25 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        env_prefix="",
         case_sensitive=False,
         extra="ignore",
     )
 
-    # --- LLM ---
-    anthropic_api_key: SecretStr = Field(..., alias="ANTHROPIC_API_KEY")
+    # --- GitHub (required for v0.1) ---
+    github_token: SecretStr = Field(..., alias="GITHUB_TOKEN")
+    github_user: str = Field(..., alias="GITHUB_USER")
+    github_host: str = Field("api.github.com", alias="GITHUB_HOST")
+
+    # --- LLM (optional until v0.2 lands Aria) ---
+    anthropic_api_key: SecretStr | None = Field(None, alias="ANTHROPIC_API_KEY")
     foreman_llm_model: str = Field("claude-sonnet-4-6", alias="FOREMAN_LLM_MODEL")
 
-    # --- GitHub ---
-    github_token: SecretStr = Field(..., alias="GITHUB_TOKEN")
-    github_host: str = Field("api.github.com", alias="GITHUB_HOST")
-    github_user: str = Field(..., alias="GITHUB_USER")
+    # --- Jira (optional until v0.2) ---
+    jira_base_url: str | None = Field(None, alias="JIRA_BASE_URL")
+    jira_email: str | None = Field(None, alias="JIRA_EMAIL")
+    jira_api_token: SecretStr | None = Field(None, alias="JIRA_API_TOKEN")
 
-    # --- Jira ---
-    jira_base_url: str = Field(..., alias="JIRA_BASE_URL")
-    jira_email: str = Field(..., alias="JIRA_EMAIL")
-    jira_api_token: SecretStr = Field(..., alias="JIRA_API_TOKEN")
-
-    # --- Slack ---
+    # --- Slack (optional until v0.3) ---
     slack_bot_token: SecretStr | None = Field(None, alias="SLACK_BOT_TOKEN")
     slack_user_token: SecretStr | None = Field(None, alias="SLACK_USER_TOKEN")
     slack_team_id: str | None = Field(None, alias="SLACK_TEAM_ID")

@@ -37,7 +37,7 @@ ENV/
 
 # --- uv ---
 .uv/
-uv.lock
+# Note: uv.lock IS committed (this is an application, not a library).
 
 # --- Tests / coverage ---
 .pytest_cache/

@@ -47,12 +47,12 @@ dev = [
 ]
 
 [project.scripts]
-foreman = "foreman.cli:app"
+foreman = "foreman.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/tanmayshah96/foreman"
-Repository = "https://github.com/tanmayshah96/foreman"
-Issues = "https://github.com/tanmayshah96/foreman/issues"
+Homepage = "https://github.com/tanmay5/foreman"
+Repository = "https://github.com/tanmay5/foreman"
+Issues = "https://github.com/tanmay5/foreman/issues"
 
 [build-system]
 requires = ["hatchling"]

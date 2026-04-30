@@ -1,8 +1,8 @@
 """Command-line entry point for Foreman.
 
-v0.1 surface:
-    foreman briefing      # force a briefing now (GitHub-only)
-    foreman doctor        # verify config + GitHub auth
+v0.2 surface:
+    foreman briefing      # Aria synthesizes a real briefing (LLM)
+    foreman doctor        # verify config + GitHub auth + Anthropic key
 
 Other commands are stubbed and raise NotImplementedError until later
 versions land them.
@@ -11,19 +11,20 @@ versions land them.
 from __future__ import annotations
 
 import asyncio
-import sys
 from datetime import datetime, timezone
 
 import typer
+from rich import box
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-from rich import box
 
 from foreman import __version__
+from foreman.agents.aria import Aria
 from foreman.config import Settings, load_settings
 from foreman.connectors.github import GitHubConnector, GitHubError, PR
+from foreman.llm.client import LLMClient, LLMError
 from foreman.ui.theme import AGENT_COLORS, DIM
 
 app = typer.Typer(
@@ -41,7 +42,7 @@ console = Console()
 
 @app.command()
 def briefing() -> None:
-    """Force a briefing right now (v0.1: GitHub-only)."""
+    """Force a briefing right now. Aria synthesizes if ANTHROPIC_API_KEY is set."""
     try:
         settings = load_settings()
     except Exception as e:
@@ -55,8 +56,7 @@ def briefing() -> None:
 async def _briefing(settings: Settings) -> None:
     _render_header()
 
-    console.print(f"\n[bold]Good morning, {settings.github_user}.[/bold]\n")
-
+    # 1. Fetch GitHub state
     async with GitHubConnector(settings) as gh:
         try:
             review_prs, my_prs = await asyncio.gather(
@@ -68,31 +68,70 @@ async def _briefing(settings: Settings) -> None:
             console.print(f"[{DIM}]Run `foreman doctor` to verify your token.[/]")
             raise typer.Exit(code=1) from e
 
-    color_tony = AGENT_COLORS["tony"]
-    color_aria = AGENT_COLORS["aria"]
+    aria_color = AGENT_COLORS["aria"]
+    tony_color = AGENT_COLORS["tony"]
 
+    # 2. Aria synthesizes (if LLM is configured); else fall back to a templated line.
+    if settings.anthropic_api_key is not None:
+        try:
+            async with LLMClient(settings) as llm:
+                aria = Aria(llm)
+                narrative = await aria.synthesize_briefing(
+                    user_name=settings.github_user,
+                    review_prs=review_prs,
+                    my_open_prs=my_prs,
+                )
+            _render_aria_panel(narrative, aria_color)
+        except LLMError as e:
+            console.print(f"[{DIM}]Aria unavailable ({e}). Falling back to templated briefing.[/]")
+            _render_templated_lead(settings, review_prs, aria_color)
+    else:
+        _render_templated_lead(settings, review_prs, aria_color)
+
+    # 3. Always render the structured panels — Aria narrates, the tables back her up.
     if review_prs:
-        console.print(_pr_table(f"PRs awaiting your review ({len(review_prs)})", review_prs, color_tony))
+        console.print(_pr_table(f"PRs awaiting your review ({len(review_prs)})", review_prs, tony_color))
     else:
         console.print(f"[{DIM}]No PRs awaiting your review.[/{DIM}]")
 
     console.print()
 
     if my_prs:
-        console.print(_pr_table(f"Your open PRs ({len(my_prs)})", my_prs, color_aria))
+        console.print(_pr_table(f"Your open PRs ({len(my_prs)})", my_prs, aria_color))
     else:
         console.print(f"[{DIM}]You have no open PRs.[/{DIM}]")
 
-    # One-line summary at the bottom
-    urgent = len(review_prs)
     console.print()
-    if urgent == 0:
-        console.print(f"[bold {color_aria}]Nothing urgent. Good day for deep work.[/]")
+
+
+def _render_aria_panel(narrative: str, color: str) -> None:
+    title = Text()
+    title.append("Aria", style=f"bold {color}")
+    title.append("  ·  ", style=DIM)
+    title.append("BRIEFING", style=DIM)
+    console.print(
+        Panel(
+            narrative.strip(),
+            title=title,
+            title_align="left",
+            border_style=color,
+            box=box.ROUNDED,
+            padding=(1, 2),
+        )
+    )
+    console.print()
+
+
+def _render_templated_lead(settings: Settings, review_prs: list[PR], color: str) -> None:
+    """Fallback when Aria isn't available — keeps v0.1 behavior intact."""
+    console.print(f"\n[bold]Good morning, {settings.github_user}.[/bold]\n")
+    if not review_prs:
+        console.print(f"[bold {color}]Nothing urgent. Good day for deep work.[/]\n")
     else:
         first = review_prs[0]
         console.print(
-            f"[bold {color_aria}]Suggested first action:[/] review PR "
-            f"[bold]#{first.number}[/] in {first.repo} — {first.title}"
+            f"[bold {color}]Suggested first action:[/] review PR "
+            f"[bold]#{first.number}[/] in {first.repo} — {first.title}\n"
         )
 
 
@@ -138,7 +177,6 @@ def _pr_table(title: str, prs: list[PR], color: str) -> Table:
 
 
 def _humanize_age(iso_ts: str) -> str:
-    """ISO 8601 -> '3d' / '5h' / 'now'."""
     try:
         dt = datetime.fromisoformat(iso_ts.replace("Z", "+00:00"))
     except ValueError:
@@ -170,7 +208,7 @@ def doctor() -> None:
 
 async def _doctor(settings: Settings) -> None:
     _render_header()
-    console.print(f"\n[bold]Configuration[/bold]")
+    console.print("\n[bold]Configuration[/bold]")
     console.print(f"  github_user      = {settings.github_user}")
     console.print(f"  github_host      = {settings.github_host}")
     console.print(f"  data_dir         = {settings.data_dir}")
@@ -179,24 +217,39 @@ async def _doctor(settings: Settings) -> None:
     console.print()
 
     console.print("[bold]Connectors[/bold]")
-    async with GitHubConnector(settings) as gh:
-        result = await gh.health_check()
-    if result.get("ok"):
-        scopes = result.get("scopes") or "(fine-grained PAT)"
-        console.print(f"  [green]✓[/] github  user={result.get('user')}  scopes={scopes}")
-    else:
-        console.print(f"  [red]✗[/] github  status={result.get('status_code')}  error={result.get('error', '')}")
-        console.print(f"  [{DIM}]Verify GITHUB_TOKEN is valid and has repo + pull-request read scopes.[/]")
 
-    if settings.anthropic_api_key is None:
-        console.print(f"  [{DIM}]· anthropic   not configured (required from v0.2)[/]")
+    # GitHub
+    async with GitHubConnector(settings) as gh:
+        gh_result = await gh.health_check()
+    if gh_result.get("ok"):
+        scopes = gh_result.get("scopes") or "(fine-grained PAT)"
+        console.print(f"  [green]✓[/] github     user={gh_result.get('user')}  scopes={scopes}")
     else:
-        console.print(f"  [green]✓[/] anthropic key configured")
+        console.print(
+            f"  [red]✗[/] github     status={gh_result.get('status_code')}  "
+            f"error={gh_result.get('error', '')}"
+        )
+
+    # Anthropic
+    if settings.anthropic_api_key is None:
+        console.print(f"  [{DIM}]· anthropic  not configured (briefing will use templated fallback)[/]")
+    else:
+        try:
+            async with LLMClient(settings) as llm:
+                # Tiny ping — cheap roundtrip just to verify the key works.
+                await llm.ask(
+                    system="Reply with the single word: ok",
+                    user="ping",
+                    max_tokens=10,
+                )
+            console.print(f"  [green]✓[/] anthropic  model={settings.foreman_llm_model}")
+        except LLMError as e:
+            console.print(f"  [red]✗[/] anthropic  {e}")
 
     if settings.jira_api_token is None:
-        console.print(f"  [{DIM}]· jira        not configured (required from v0.2)[/]")
+        console.print(f"  [{DIM}]· jira       not configured (required from v0.3)[/]")
     if settings.slack_bot_token is None:
-        console.print(f"  [{DIM}]· slack       not configured (required from v0.3)[/]")
+        console.print(f"  [{DIM}]· slack      not configured (required from v0.3)[/]")
 
 
 # --- stubs (later versions) ---------------------------------------------------
@@ -219,14 +272,21 @@ def run() -> None:
 @app.command(name="review-pr")
 def review_pr(pr_number: int) -> None:
     """Have Tony review a specific PR by number."""
-    console.print(f"[{DIM}]Not implemented yet (v0.2).[/]")
+    console.print(f"[{DIM}]Not implemented yet (v0.3 — Tony comes online).[/]")
     raise typer.Exit(code=1)
 
 
 @app.command()
 def jira(key: str) -> None:
     """Have Nat analyze a Jira ticket by key."""
-    console.print(f"[{DIM}]Not implemented yet (v0.2).[/]")
+    console.print(f"[{DIM}]Not implemented yet (v0.3 — Nat comes online).[/]")
+    raise typer.Exit(code=1)
+
+
+@app.command()
+def standup() -> None:
+    """Auto-generate today's standup from yesterday's activity."""
+    console.print(f"[{DIM}]Not implemented yet (v0.3 — needs Jira + Slack).[/]")
     raise typer.Exit(code=1)
 
 

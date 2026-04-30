@@ -396,6 +396,63 @@ async def _standup(settings: Settings) -> None:
     )
 
 
+@app.command()
+def ask(question: str = typer.Argument(..., help="Your question, in quotes")) -> None:
+    """Ask Steve anything — he sees your live GitHub state."""
+    try:
+        settings = load_settings()
+    except Exception as e:
+        console.print(f"[red]Config error:[/red] {e}")
+        raise typer.Exit(code=2)
+    if settings.anthropic_api_key is None:
+        console.print(f"[red]ask needs ANTHROPIC_API_KEY.[/red]")
+        raise typer.Exit(code=2)
+    asyncio.run(_ask(settings, question))
+
+
+async def _ask(settings: Settings, question: str) -> None:
+    from foreman.agents.steve import Steve
+    _render_header()
+    async with GitHubConnector(settings) as gh:
+        try:
+            review, open_, merged = await asyncio.gather(
+                gh.poll_review_requested(),
+                gh.poll_my_open_prs(),
+                gh.poll_recently_merged(hours=24),
+            )
+        except GitHubError as e:
+            console.print(f"[red]GitHub error:[/red] {e}")
+            raise typer.Exit(code=1) from e
+
+    async with LLMClient(settings) as llm:
+        try:
+            text = await Steve(llm).ask(
+                question=question,
+                review_prs=review,
+                my_open_prs=open_,
+                recent_merged=merged,
+            )
+        except LLMError as e:
+            console.print(f"[red]Steve failed:[/red] {e}")
+            raise typer.Exit(code=1) from e
+
+    color = AGENT_COLORS["steve"]
+    title = Text()
+    title.append("Steve", style=f"bold {color}")
+    title.append("  ·  ", style=DIM)
+    title.append(question[:60] + ("..." if len(question) > 60 else ""), style=DIM)
+    console.print(
+        Panel(
+            text.strip(),
+            title=title,
+            title_align="left",
+            border_style=color,
+            box=box.ROUNDED,
+            padding=(1, 2),
+        )
+    )
+
+
 # --- entrypoint ---------------------------------------------------------------
 
 

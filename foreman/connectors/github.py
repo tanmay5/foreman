@@ -84,6 +84,36 @@ class GitHubConnector:
         q = f"type:pr is:merged author:{self._settings.github_user} merged:>{since}"
         return await self._search_prs(q)
 
+    async def get_pr_detail(self, repo: str, number: int) -> dict[str, Any]:
+        """Fetch a PR's metadata (title, body, author, additions/deletions, etc)."""
+        r = await self._client.get(f"/repos/{repo}/pulls/{number}")
+        if r.status_code != 200:
+            raise GitHubError(f"PR fetch failed [{r.status_code}]: {r.text[:200]}")
+        return r.json()
+
+    async def get_pr_diff(self, repo: str, number: int, max_chars: int = 60000) -> str:
+        """Fetch the unified diff for a PR. Truncates very large diffs."""
+        r = await self._client.get(
+            f"/repos/{repo}/pulls/{number}",
+            headers={"Accept": "application/vnd.github.v3.diff"},
+        )
+        if r.status_code != 200:
+            raise GitHubError(f"Diff fetch failed [{r.status_code}]: {r.text[:200]}")
+        text = r.text
+        if len(text) > max_chars:
+            text = text[:max_chars] + f"\n\n[...truncated at {max_chars} chars]"
+        return text
+
+    async def find_pr_repo(self, number: int) -> str | None:
+        """Search the user's review queue + own PRs for a number; return owner/repo if found."""
+        for pr in await self.poll_review_requested():
+            if pr.number == number:
+                return pr.repo
+        for pr in await self.poll_my_open_prs():
+            if pr.number == number:
+                return pr.repo
+        return None
+
     async def health_check(self) -> dict[str, Any]:
         """Verify the token is valid by hitting /user."""
         try:

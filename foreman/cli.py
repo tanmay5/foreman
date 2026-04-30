@@ -270,10 +270,66 @@ def run() -> None:
 
 
 @app.command(name="review-pr")
-def review_pr(pr_number: int) -> None:
-    """Have Tony review a specific PR by number."""
-    console.print(f"[{DIM}]Not implemented yet (v0.3 — Tony comes online).[/]")
-    raise typer.Exit(code=1)
+def review_pr(
+    number: int = typer.Argument(..., help="PR number"),
+    repo: str | None = typer.Option(None, "--repo", "-r", help="owner/name (auto-detected if omitted)"),
+) -> None:
+    """Have Tony review a specific PR. Auto-detects repo from your queue if not specified."""
+    try:
+        settings = load_settings()
+    except Exception as e:
+        console.print(f"[red]Config error:[/red] {e}")
+        raise typer.Exit(code=2)
+    if settings.anthropic_api_key is None:
+        console.print(f"[red]review-pr needs ANTHROPIC_API_KEY.[/red]")
+        raise typer.Exit(code=2)
+    asyncio.run(_review_pr(settings, number, repo))
+
+
+async def _review_pr(settings: Settings, number: int, repo: str | None) -> None:
+    from foreman.agents.tony import Tony
+    _render_header()
+
+    async with GitHubConnector(settings) as gh:
+        if repo is None:
+            repo = await gh.find_pr_repo(number)
+            if repo is None:
+                console.print(
+                    f"[red]PR #{number} not found in your review queue or open PRs.[/red]\n"
+                    f"[{DIM}]Try: foreman review-pr {number} --repo owner/name[/]"
+                )
+                raise typer.Exit(code=1)
+        try:
+            detail = await gh.get_pr_detail(repo, number)
+            diff = await gh.get_pr_diff(repo, number)
+        except GitHubError as e:
+            console.print(f"[red]GitHub error:[/red] {e}")
+            raise typer.Exit(code=1) from e
+
+    console.print(f"[{DIM}]Tony reviewing {repo}#{number}...[/]\n")
+
+    async with LLMClient(settings) as llm:
+        try:
+            text = await Tony(llm).review_pr(pr_detail=detail, diff=diff)
+        except LLMError as e:
+            console.print(f"[red]Tony failed:[/red] {e}")
+            raise typer.Exit(code=1) from e
+
+    color = AGENT_COLORS["tony"]
+    title = Text()
+    title.append("Tony", style=f"bold {color}")
+    title.append("  ·  ", style=DIM)
+    title.append("PR REVIEW", style=DIM)
+    console.print(
+        Panel(
+            text.strip(),
+            title=title,
+            title_align="left",
+            border_style=color,
+            box=box.ROUNDED,
+            padding=(1, 2),
+        )
+    )
 
 
 @app.command()

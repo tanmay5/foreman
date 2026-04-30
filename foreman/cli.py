@@ -285,9 +285,59 @@ def jira(key: str) -> None:
 
 @app.command()
 def standup() -> None:
-    """Auto-generate today's standup from yesterday's activity."""
-    console.print(f"[{DIM}]Not implemented yet (v0.3 — needs Jira + Slack).[/]")
-    raise typer.Exit(code=1)
+    """Auto-generate today's standup from yesterday's GitHub activity."""
+    try:
+        settings = load_settings()
+    except Exception as e:
+        console.print(f"[red]Config error:[/red] {e}")
+        raise typer.Exit(code=2)
+    if settings.anthropic_api_key is None:
+        console.print(f"[red]Standup needs ANTHROPIC_API_KEY.[/red] Add it to .env.")
+        raise typer.Exit(code=2)
+    asyncio.run(_standup(settings))
+
+
+async def _standup(settings: Settings) -> None:
+    _render_header()
+    async with GitHubConnector(settings) as gh:
+        try:
+            merged, review, open_ = await asyncio.gather(
+                gh.poll_recently_merged(hours=24),
+                gh.poll_review_requested(),
+                gh.poll_my_open_prs(),
+            )
+        except GitHubError as e:
+            console.print(f"[red]GitHub error:[/red] {e}")
+            raise typer.Exit(code=1) from e
+
+    async with LLMClient(settings) as llm:
+        aria = Aria(llm)
+        try:
+            text = await aria.synthesize_standup(
+                user_name=settings.github_user,
+                yesterday_merged=merged,
+                today_review=review,
+                today_open=open_,
+            )
+        except LLMError as e:
+            console.print(f"[red]Aria failed:[/red] {e}")
+            raise typer.Exit(code=1) from e
+
+    color = AGENT_COLORS["aria"]
+    title = Text()
+    title.append("Aria", style=f"bold {color}")
+    title.append("  ·  ", style=DIM)
+    title.append("STANDUP", style=DIM)
+    console.print(
+        Panel(
+            text.strip(),
+            title=title,
+            title_align="left",
+            border_style=color,
+            box=box.ROUNDED,
+            padding=(1, 2),
+        )
+    )
 
 
 # --- entrypoint ---------------------------------------------------------------

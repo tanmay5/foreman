@@ -41,6 +41,26 @@ class Aria(Agent):
         }
         return await self._llm.ask(system, json.dumps(payload, indent=2), max_tokens=500)
 
+    async def synthesize_standup(
+        self,
+        *,
+        user_name: str,
+        yesterday_merged: list[PR],
+        today_review: list[PR],
+        today_open: list[PR],
+    ) -> str:
+        """Produce structured standup notes (Yesterday / Today / Blockers)."""
+        from foreman.agents.base import PROMPTS_DIR
+        system = (PROMPTS_DIR / "aria_standup.txt").read_text(encoding="utf-8").strip()
+        payload = {
+            "user_name": user_name,
+            "today": datetime.now().date().isoformat(),
+            "yesterday_merged": [_pr_summary(p) for p in yesterday_merged],
+            "today_review": [_pr_summary(p) for p in today_review],
+            "today_open": [_pr_summary(p) for p in today_open],
+        }
+        return await self._llm.ask(system, json.dumps(payload, indent=2), max_tokens=500)
+
 
 def _pr_summary(pr: PR) -> dict[str, Any]:
     """Compact dict shape Aria sees. Strip URLs, keep semantics."""

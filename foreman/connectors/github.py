@@ -77,6 +77,13 @@ class GitHubConnector:
         q = f"type:pr state:open author:{self._settings.github_user}"
         return await self._search_prs(q)
 
+    async def poll_recently_merged(self, hours: int = 24) -> list[PR]:
+        """User's PRs merged within the last `hours` (default 24)."""
+        from datetime import datetime, timedelta, timezone
+        since = (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        q = f"type:pr is:merged author:{self._settings.github_user} merged:>{since}"
+        return await self._search_prs(q)
+
     async def health_check(self) -> dict[str, Any]:
         """Verify the token is valid by hitting /user."""
         try:

@@ -25,6 +25,7 @@ from foreman.agents.aria import Aria
 from foreman.config import Settings, load_settings
 from foreman.connectors.github import GitHubConnector, GitHubError, PR
 from foreman.connectors.linear import Issue, LinearConnector, LinearError
+from foreman.connectors.slack import Message, SlackConnector, SlackError
 from foreman.core.db import Database
 from foreman.llm.client import LLMClient, LLMError
 from foreman.ui.theme import AGENT_COLORS, DIM
@@ -319,8 +320,19 @@ async def _doctor(settings: Settings) -> None:
 
     if settings.jira_api_token is None:
         console.print(f"  [{DIM}]· jira       not configured (connector lands in a future release)[/]")
-    if settings.slack_bot_token is None:
-        console.print(f"  [{DIM}]· slack      not configured (connector lands in a future release)[/]")
+    # Slack
+    if settings.slack_user_token is None:
+        console.print(f"  [{DIM}]· slack      not configured (SLACK_USER_TOKEN)[/]")
+    else:
+        try:
+            async with SlackConnector(settings) as slack:
+                sr = await slack.health_check()
+            if sr.get("ok"):
+                console.print(f"  [green]✓[/] slack      user={sr.get('user')}  team={sr.get('team')}")
+            else:
+                console.print(f"  [red]✗[/] slack      {sr.get('error', '')}")
+        except Exception as e:
+            console.print(f"  [red]✗[/] slack      {e}")
     if settings.google_calendar_token is None:
         console.print(f"  [{DIM}]· calendar   not configured (connector lands in a future release)[/]")
     if settings.sentry_auth_token is None:
@@ -485,6 +497,67 @@ async def _triage(settings: Settings, identifier: str) -> None:
     Database(settings.db_path).log_event(
         kind="triage", agent="nat",
         input_summary=identifier, output=text,
+        meta={"model": settings.foreman_llm_model},
+    )
+
+
+@app.command()
+def digest() -> None:
+    """Have Nick produce a Slack digest of recent DMs."""
+    try:
+        settings = load_settings()
+    except Exception as e:
+        console.print(f"[red]Config error:[/red] {e}")
+        raise typer.Exit(code=2)
+    if settings.anthropic_api_key is None:
+        console.print(f"[red]digest needs ANTHROPIC_API_KEY.[/red]")
+        raise typer.Exit(code=2)
+    if settings.slack_user_token is None:
+        console.print(f"[red]digest needs SLACK_USER_TOKEN.[/red] Create a Slack app at https://api.slack.com/apps")
+        raise typer.Exit(code=2)
+    asyncio.run(_digest(settings))
+
+
+async def _digest(settings: Settings) -> None:
+    from foreman.agents.nick import Nick
+    _render_header()
+    try:
+        async with SlackConnector(settings) as slack:
+            dms = await slack.poll_recent_dms(hours=24)
+    except SlackError as e:
+        console.print(f"[red]Slack error:[/red] {e}")
+        raise typer.Exit(code=1) from e
+
+    if not dms:
+        console.print(f"[{DIM}]No DMs in the last 24 hours. Quiet inbox.[/]")
+        return
+
+    async with LLMClient(settings) as llm:
+        try:
+            text = await Nick(llm).synthesize_digest(dms=dms)
+        except LLMError as e:
+            console.print(f"[red]Nick failed:[/red] {e}")
+            raise typer.Exit(code=1) from e
+
+    color = AGENT_COLORS["nick"]
+    title = Text()
+    title.append("Nick", style=f"bold {color}")
+    title.append("  ·  ", style=DIM)
+    title.append("SLACK DIGEST", style=DIM)
+    console.print(
+        Panel(
+            text.strip(),
+            title=title,
+            title_align="left",
+            border_style=color,
+            box=box.ROUNDED,
+            padding=(1, 2),
+        )
+    )
+
+    Database(settings.db_path).log_event(
+        kind="digest", agent="nick",
+        input_summary=f"dms={len(dms)}", output=text,
         meta={"model": settings.foreman_llm_model},
     )
 

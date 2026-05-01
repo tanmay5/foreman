@@ -1,14 +1,27 @@
 """Nick — Slack digest agent.
 
-Domain: DM and mention triage, urgency scoring, reply-needed flagging.
-
-Tools: get_dm_thread, get_channel_context, get_user_profile.
-
-Nick distinguishes between "FYI ping," "needs your input," and "blocking
-someone right now." He learns over time which channels and senders the
-user actually responds to vs ignores.
+Domain: DMs, mentions (later), reply-needed flagging.
+v0.7 surface: synthesize_digest(dms) -> str
 """
 
 from __future__ import annotations
 
-# TODO(v0.3)
+import json
+from datetime import datetime
+
+from foreman.agents.base import Agent
+from foreman.connectors.slack import Message
+
+
+class Nick(Agent):
+    name = "nick"
+    color_key = "nick"
+    prompt_file = "nick.txt"
+
+    async def synthesize_digest(self, *, dms: list[Message]) -> str:
+        system = self._load_prompt()
+        payload = {
+            "today": datetime.now().date().isoformat(),
+            "dms": [{"sender": m.sender, "text": m.text} for m in dms],
+        }
+        return await self._llm.ask(system, json.dumps(payload), max_tokens=500)

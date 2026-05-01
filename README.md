@@ -11,7 +11,7 @@ A small team of specialized AI agents that synthesize signals across GitHub, Lin
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/status-v1.0--vision-purple.svg)](#roadmap)
 
-![Foreman banner](docs/screenshots/01-banner.svg)
+![Foreman banner](https://raw.githubusercontent.com/tanmay5/foreman/main/docs/screenshots/01-banner.svg)
 
 </div>
 
@@ -27,17 +27,17 @@ It runs locally. Your data never leaves your machine.
 
 Every time you start your day, ask once. Aria reads across GitHub, Linear, Jira, Slack, and your calendar, then tells you what actually matters today with a concrete first action. The narrative is generated each run from your real state. Cross-source synthesis is the moat.
 
-![Cross-source briefing](docs/screenshots/07-cross-source.svg)
+![Cross-source briefing](https://raw.githubusercontent.com/tanmay5/foreman/main/docs/screenshots/07-cross-source.svg)
 
 If you only configure GitHub, you get a GitHub briefing. As you add Linear, Jira, and Slack, the synthesis gets sharper because Aria can spot connections (a Slack DM about a PR that touches a security ticket, all in one motion).
 
-![GitHub-only briefing](docs/screenshots/02-briefing.svg)
+![GitHub-only briefing](https://raw.githubusercontent.com/tanmay5/foreman/main/docs/screenshots/02-briefing.svg)
 
 ## Real PR reviews, not summaries
 
 Tony reads the unified diff and produces a focused review with file:line references, prioritized by what actually breaks production. Bugs, missing error handling, security, breaking API changes, missing tests.
 
-![PR Review](docs/screenshots/03-review.svg)
+![PR Review](https://raw.githubusercontent.com/tanmay5/foreman/main/docs/screenshots/03-review.svg)
 
 You stay in the loop. Tony tees up the context so you're not starting cold.
 
@@ -45,25 +45,25 @@ You stay in the loop. Tony tees up the context so you're not starting cold.
 
 Nat reads a Linear or Jira ticket and produces a structured triage: a summary, a concrete plan with verb-and-target steps, and an effort estimate. Security and migration tickets get escalated automatically.
 
-![Ticket triage](docs/screenshots/05-nat-triage.svg)
+![Ticket triage](https://raw.githubusercontent.com/tanmay5/foreman/main/docs/screenshots/05-nat-triage.svg)
 
 ## Slack digest, not Slack noise
 
 Nick distinguishes "FYI ping" from "needs your input" from "blocking someone right now," learning over time which channels and senders you actually respond to. Real Slack OAuth, no cookie scraping.
 
-![Slack digest](docs/screenshots/06-nick-slack.svg)
+![Slack digest](https://raw.githubusercontent.com/tanmay5/foreman/main/docs/screenshots/06-nick-slack.svg)
 
 ## Time-budget awareness
 
 Aria reads your calendar so the briefing isn't blind to your day. "You have 3 hours of focus before your 1:1, push deep work" beats "here are your PRs" every time.
 
-![Calendar focus](docs/screenshots/08-calendar-focus.svg)
+![Calendar focus](https://raw.githubusercontent.com/tanmay5/foreman/main/docs/screenshots/08-calendar-focus.svg)
 
 ## Ask anything
 
 Steve has read access to your live state across every connector. Senior-engineer voice, no fluff. Gives a recommendation, not options.
 
-![Ask](docs/screenshots/04-ask.svg)
+![Ask](https://raw.githubusercontent.com/tanmay5/foreman/main/docs/screenshots/04-ask.svg)
 
 ## Meet the team
 

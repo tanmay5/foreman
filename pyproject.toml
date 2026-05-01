@@ -1,6 +1,6 @@
 [project]
 name = "foreman-cli"
-version = "0.7.0"
+version = "0.7.1"
 description = "Personal engineering chief-of-staff. Synthesizes signals across GitHub, Jira, and Slack into a daily briefing that learns your patterns and tells you what actually matters."
 readme = "README.md"
 requires-python = ">=3.11"

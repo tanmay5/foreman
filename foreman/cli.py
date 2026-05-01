@@ -276,9 +276,21 @@ def init() -> None:
 
 @app.command()
 def run() -> None:
-    """Start the foreman daemon (polling + TUI)."""
-    console.print(f"[{DIM}]Not implemented yet (v0.5). For now: run `foreman briefing`.[/]")
-    raise typer.Exit(code=1)
+    """Start the always-on daemon: background GitHub polling + interactive REPL."""
+    try:
+        settings = load_settings()
+    except Exception as e:
+        console.print(f"[red]Config error:[/red] {e}")
+        raise typer.Exit(code=2)
+    if settings.anthropic_api_key is None:
+        console.print(f"[red]foreman run needs ANTHROPIC_API_KEY.[/red]")
+        raise typer.Exit(code=2)
+
+    from foreman.daemon.runner import run_daemon
+    try:
+        asyncio.run(run_daemon(settings))
+    except KeyboardInterrupt:
+        console.print(f"\n[{DIM}]bye.[/]")
 
 
 @app.command(name="review-pr")

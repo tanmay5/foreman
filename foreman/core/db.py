@@ -27,6 +27,13 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts);
 CREATE INDEX IF NOT EXISTS idx_events_kind ON events(kind);
+
+CREATE TABLE IF NOT EXISTS seen_items (
+    source TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    first_seen TEXT NOT NULL,
+    PRIMARY KEY (source, item_id)
+);
 """
 
 
@@ -73,3 +80,20 @@ class Database:
     def count(self) -> int:
         with self._conn() as c:
             return int(c.execute("SELECT COUNT(*) FROM events").fetchone()[0])
+
+    def load_seen(self, source: str) -> set[str]:
+        with self._conn() as c:
+            rows = c.execute(
+                "SELECT item_id FROM seen_items WHERE source = ?", (source,)
+            ).fetchall()
+        return {r[0] for r in rows}
+
+    def mark_seen(self, source: str, item_ids: list[str]) -> None:
+        if not item_ids:
+            return
+        ts = datetime.now(timezone.utc).isoformat()
+        with self._conn() as c:
+            c.executemany(
+                "INSERT OR IGNORE INTO seen_items (source, item_id, first_seen) VALUES (?, ?, ?)",
+                [(source, i, ts) for i in item_ids],
+            )

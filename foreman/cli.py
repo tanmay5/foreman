@@ -24,6 +24,7 @@ from foreman import __version__
 from foreman.agents.aria import Aria
 from foreman.config import Settings, load_settings
 from foreman.connectors.github import GitHubConnector, GitHubError, PR
+from foreman.core.db import Database
 from foreman.llm.client import LLMClient, LLMError
 from foreman.ui.theme import AGENT_COLORS, DIM
 
@@ -72,6 +73,7 @@ async def _briefing(settings: Settings) -> None:
     tony_color = AGENT_COLORS["tony"]
 
     # 2. Aria synthesizes (if LLM is configured); else fall back to a templated line.
+    narrative: str | None = None
     if settings.anthropic_api_key is not None:
         try:
             async with LLMClient(settings) as llm:
@@ -87,6 +89,16 @@ async def _briefing(settings: Settings) -> None:
             _render_templated_lead(settings, review_prs, aria_color)
     else:
         _render_templated_lead(settings, review_prs, aria_color)
+
+    # 2b. Log to memory.
+    if narrative is not None:
+        Database(settings.db_path).log_event(
+            kind="briefing",
+            agent="aria",
+            input_summary=f"review={len(review_prs)} open={len(my_prs)}",
+            output=narrative,
+            meta={"model": settings.foreman_llm_model},
+        )
 
     # 3. Always render the structured panels — Aria narrates, the tables back her up.
     if review_prs:
@@ -331,6 +343,14 @@ async def _review_pr(settings: Settings, number: int, repo: str | None) -> None:
         )
     )
 
+    Database(settings.db_path).log_event(
+        kind="review",
+        agent="tony",
+        input_summary=f"{repo}#{number}",
+        output=text,
+        meta={"model": settings.foreman_llm_model, "additions": detail.get("additions"), "deletions": detail.get("deletions")},
+    )
+
 
 @app.command()
 def jira(key: str) -> None:
@@ -395,6 +415,14 @@ async def _standup(settings: Settings) -> None:
         )
     )
 
+    Database(settings.db_path).log_event(
+        kind="standup",
+        agent="aria",
+        input_summary=f"merged={len(merged)} review={len(review)} open={len(open_)}",
+        output=text,
+        meta={"model": settings.foreman_llm_model},
+    )
+
 
 @app.command()
 def ask(question: str = typer.Argument(..., help="Your question, in quotes")) -> None:
@@ -451,6 +479,52 @@ async def _ask(settings: Settings, question: str) -> None:
             padding=(1, 2),
         )
     )
+
+    Database(settings.db_path).log_event(
+        kind="ask",
+        agent="steve",
+        input_summary=question,
+        output=text,
+        meta={"model": settings.foreman_llm_model},
+    )
+
+
+@app.command()
+def history(limit: int = typer.Option(10, "--limit", "-n", help="How many recent events")) -> None:
+    """Show recent agent invocations from the local memory log."""
+    try:
+        settings = load_settings()
+    except Exception as e:
+        console.print(f"[red]Config error:[/red] {e}")
+        raise typer.Exit(code=2)
+
+    db = Database(settings.db_path)
+    rows = db.recent(limit=limit)
+    total = db.count()
+
+    _render_header()
+    console.print(f"\n[bold]Memory[/bold]  {total} events stored at {settings.db_path}\n")
+
+    if not rows:
+        console.print(f"[{DIM}](no events yet — run briefing/standup/review-pr/ask)[/]")
+        return
+
+    table = Table(box=box.SIMPLE, show_header=True, header_style=f"bold {DIM}", padding=(0, 1))
+    table.add_column("When", style=DIM, no_wrap=True)
+    table.add_column("Kind", no_wrap=True)
+    table.add_column("Agent", no_wrap=True)
+    table.add_column("Summary", overflow="fold")
+    for r in rows:
+        agent = r.get("agent") or ""
+        agent_color = AGENT_COLORS.get(agent, "")
+        agent_cell = f"[{agent_color}]{agent}[/]" if agent_color else agent
+        table.add_row(
+            (r["ts"] or "")[:19].replace("T", " "),
+            r["kind"],
+            agent_cell,
+            (r.get("input_summary") or "")[:80],
+        )
+    console.print(table)
 
 
 # --- entrypoint ---------------------------------------------------------------

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 320" font-family="ui-monospace, 'SF Mono', Menlo, Monaco, monospace">
+  <rect width="820" height="320" rx="10" fill="#0d1117"/>
+
+  <!-- title bar -->
+  <rect width="820" height="34" rx="10" fill="#161b22"/>
+  <rect y="24" width="820" height="10" fill="#161b22"/>
+  <circle cx="20" cy="17" r="6" fill="#ff5f56"/>
+  <circle cx="42" cy="17" r="6" fill="#ffbd2e"/>
+  <circle cx="64" cy="17" r="6" fill="#27c93f"/>
+  <text x="410" y="22" text-anchor="middle" font-size="12" fill="#6B7280">foreman ask</text>
+
+  <!-- prompt -->
+  <text x="24" y="64" font-size="13" fill="#10B981" font-weight="bold">you ›</text>
+  <text x="76" y="64" font-size="13" fill="#c9d1d9">ask "should I close PR #87 or revive it?"</text>
+
+  <!-- steve panel -->
+  <rect x="24" y="84" width="772" height="208" rx="8" fill="none" stroke="#60A5FA" stroke-width="1.5"/>
+
+  <text x="44" y="112" font-size="14" font-weight="bold" fill="#60A5FA">Steve</text>
+  <text x="92" y="112" font-size="13" fill="#6B7280">·  should I close PR #87 or revive it?</text>
+
+  <text x="44" y="148" font-size="13" font-weight="bold" fill="#c9d1d9">Close it.</text>
+
+  <text x="44" y="178" font-size="13" fill="#c9d1d9">12 days isn't dead, but the buffer-pool optimization is now stale against</text>
+  <text x="44" y="200" font-size="13" fill="#c9d1d9">the auth migration landing in #312 — same module, conflicting touchpoints.</text>
+  <text x="44" y="222" font-size="13" fill="#c9d1d9">Rebasing will cost more than rewriting after #312 ships. Close, link the</text>
+  <text x="44" y="244" font-size="13" fill="#c9d1d9">issue, and reopen against the new code next week if it still matters.</text>
+
+  <text x="44" y="276" font-size="12" fill="#6B7280">Stale PRs make your profile look unmaintained. Be ruthless.</text>
+</svg>

@@ -1,84 +1,170 @@
 # Foreman
 
-> Personal engineering chief-of-staff. Always on.
+> **Personal engineering chief-of-staff. Always on.**
+> Synthesizes your GitHub into a daily briefing, reviews PRs with line-specific feedback, and answers questions about your engineering state — from one terminal window.
 
-Foreman is a terminal-native AI assistant for senior engineers drowning in signals. It synthesizes your GitHub, Jira, and Slack into a daily briefing that learns your patterns and tells you what actually matters today — not just what's new.
+[![PyPI](https://img.shields.io/pypi/v/foreman-cli.svg)](https://pypi.org/project/foreman-cli/)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://python.org)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/status-alpha-orange.svg)](#roadmap)
 
-It is **not** a notifier. Notifiers move noise from one inbox to another. Foreman is a prioritization layer on top of that noise: a small team of specialized agents (PR reviewer, Jira triager, Slack digester, daily synthesizer) that each own a domain, share a memory of how you work, and surface only the things you'd actually want surfaced.
+![Foreman banner](https://raw.githubusercontent.com/tanmay5/foreman/main/docs/screenshots/01-banner.svg)
 
-## Status
-
-🚧 **Pre-alpha.** Architecture scaffolded; first connector slice next.
+---
 
 ## Why this exists
 
-Senior engineers spend 30–60 minutes every morning context-switching between tabs to reconstruct: *what changed overnight, what's blocked on me, what's urgent, what can wait.* That ritual is identical for everyone, completely unleveraged, and extracts a real cognitive tax before the day's deep work begins.
+Senior engineers spend 30–60 minutes every morning reconstructing context across GitHub, Jira, and Slack: *what changed overnight, what's blocked on me, what's urgent, what can wait.* Existing tools either show you everything (notifiers) or show you nothing useful (digest emails). Neither learns your patterns.
 
-Existing tools either show you everything (notifiers) or show you nothing useful (digest emails). Neither learns your patterns. Neither knows that you always review Sarah's PRs same-day, that anything labeled `security` is drop-everything for you, or that the migration ticket that's been open three weeks is actually unblocked now.
+Foreman is a small team of specialized AI agents that each own a domain, share a memory of how you work, and surface only the things you'd actually want surfaced — all from a single terminal.
 
-Foreman is the assistant that closes that gap.
+It runs locally. Your data never leaves your machine.
 
-## The four agents
+## The morning briefing
 
-| Agent | Domain | What they do |
-|-------|--------|--------------|
-| **Aria** | Daily synthesis | Morning briefing. Top 3 priorities. End-of-day rollup. |
-| **Tony** | Code review | PR triage, diff analysis, review-readiness assessment. |
-| **Nat** | Jira | Ticket triage, security/migration escalation, blocker detection. |
-| **Nick** | Slack | DM and mention digest, urgency scoring, reply-needed flagging. |
-| **Steve** | General | Fallback for ad-hoc questions that don't fit the others. |
+Every time you start your day, ask once. Aria reads your live GitHub state and tells you what actually matters today, with a concrete first action.
 
-Each agent has its own scoped tool set and memory namespace. They are not prompt-prefix personas — they are real specialized agents using the LLM's tool-use API, with strict domain boundaries.
+![Briefing](https://raw.githubusercontent.com/tanmay5/foreman/main/docs/screenshots/02-briefing.svg)
 
-## Architecture in one paragraph
+This isn't a templated digest. The narrative is generated each run from your real state — PRs awaiting your review, your own open work, ages, blocking signals.
 
-Single async Python process, internal pub/sub event bus. Pluggable connectors (GitHub, Jira, Slack) poll on independent schedules and publish typed events. A prioritization engine scores each event using your historical engagement patterns from the memory layer (SQLite-backed, episodic + semantic). High-priority events route to the relevant agent for analysis; results surface in the Rich-based TUI and as macOS notifications. Each morning, Aria synthesizes the past 24 hours into a punchy briefing answering one question: *what should you do first today, and why.*
+## Real PR reviews, not summaries
 
-See [`docs/architecture.md`](docs/architecture.md) for the full design.
+Tony reads the unified diff and produces a focused review with file:line references, prioritized by what actually breaks production: bugs, missing error handling, security, breaking API changes, missing tests.
 
-## Quick start (once v0.1 ships)
+![PR Review](https://raw.githubusercontent.com/tanmay5/foreman/main/docs/screenshots/03-review.svg)
+
+You stay in the loop. Tony tees up the context so you're not starting cold.
+
+## Ask anything
+
+Steve has read access to your live GitHub state. Senior-engineer voice, no fluff, gives a recommendation not options.
+
+![Ask](https://raw.githubusercontent.com/tanmay5/foreman/main/docs/screenshots/04-ask.svg)
+
+## Meet the team
+
+| Agent | Color | Domain |
+|-------|-------|--------|
+| **Aria** | 🟢 emerald | Daily briefings, standups, synthesis |
+| **Tony** | 🔴 red | PR reviews, line-specific feedback |
+| **Nat** | 🟣 violet | Jira triage, security/migration tickets *(v0.6)* |
+| **Nick** | 🟡 amber | Slack digests, DMs, mentions *(v0.7)* |
+| **Steve** | 🔵 blue | Catch-all questions, your fallback engineer |
+
+Each agent has its own scoped tool set, its own memory namespace, and a clear domain it refuses to leave. They are not prompt-prefix personas — they're real specialized agents.
+
+---
+
+## Quick start
 
 ```bash
-# Install (once published)
-pip install foreman
-
-# Or from source
-git clone https://github.com/tanmay5/foreman.git
-cd foreman
-uv sync
-cp .env.example .env  # fill in tokens
-
-# First-run setup
-foreman init
-
-# Start the daemon
-foreman run
-
-# Or one-shot commands
-foreman briefing            # force a briefing now
-foreman review-pr 123       # have Tony review a specific PR
-foreman jira ABC-456        # have Nat analyze a ticket
+pip install foreman-cli
 ```
+
+You'll need:
+
+- **Anthropic API key** — [console.anthropic.com](https://console.anthropic.com/settings/keys) ($5 lasts ~1000 briefings on Sonnet)
+- **GitHub Personal Access Token** — [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new) with `Contents: Read` and `Pull requests: Read`
+
+Create a `.env` in your working directory:
+
+```bash
+GITHUB_TOKEN=github_pat_...
+GITHUB_USER=your-github-username
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+Then:
+
+```bash
+foreman doctor      # verify config + connectors
+foreman run         # always-on REPL with background polling
+```
+
+Or use one-shot commands:
+
+```bash
+foreman briefing             # Aria's morning briefing
+foreman standup              # standup notes from yesterday's activity
+foreman review-pr 312        # Tony reviews a PR
+foreman ask "..."            # Steve answers anything
+foreman history              # recent agent activity
+```
+
+## Commands inside `foreman run`
+
+```
+briefing              Aria's morning briefing
+standup               Aria's standup notes
+review-pr <n>         Tony reviews PR #n (auto-detects repo)
+history [n]           Recent agent activity (default 10)
+help                  This list
+quit / exit           Stop the daemon
+<anything else>       Treated as a question for Steve
+```
+
+When `foreman run` is going, a background poller checks GitHub every 10 minutes. New PRs assigned to you surface inline + as a macOS notification. First run silently registers your existing review queue so you don't get a notification storm.
+
+## How it works
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                       foreman process                       │
+│                                                             │
+│  ┌──────────────┐                                           │
+│  │  GitHub      │   ← polls every N min                     │
+│  │  connector   │                                           │
+│  └──────┬───────┘                                           │
+│         │                                                   │
+│         ▼                                                   │
+│   ┌─────────────────────────────────┐                       │
+│   │       Event Bus (asyncio)       │                       │
+│   └─────────────────┬───────────────┘                       │
+│                     ▼                                       │
+│         ┌───────────────────────┐                           │
+│         │  Memory (SQLite)      │  ← every event persists   │
+│         └───────────┬───────────┘                           │
+│                     ▼                                       │
+│   ┌────────┬────────┬────────┬────────┬────────┐            │
+│   │  Aria  │  Tony  │  Nat   │  Nick  │ Steve  │            │
+│   └────┬───┴────┬───┴────┬───┴────┬───┴────┬───┘            │
+│        ▼        ▼        ▼        ▼        ▼                │
+│   ┌─────────────────────────────────────────┐               │
+│   │   Rich TUI + macOS Notifications        │               │
+│   └─────────────────────────────────────────┘               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+See [`docs/architecture.md`](docs/architecture.md) for the full design rationale — why SQLite (not JSONL queues), why specialized agents (not a megaprompt), why local-first (privacy + zero procurement friction).
 
 ## Roadmap
 
-- **v0.1** — GitHub connector + briefing command. Spine works end-to-end.
-- **v0.2** — Jira connector + Tony agent (PR review with tool use).
-- **v0.3** — Slack connector (real OAuth app, not cookie scraping) + Nick agent.
-- **v0.4** — Memory layer + prioritization engine. The differentiator.
-- **v0.5** — Background daemon, scheduling, notifications.
-- **v1.0** — Stable, documented, brew-installable.
+- ✅ **v0.1** — GitHub connector + briefing
+- ✅ **v0.2** — Aria comes online (LLM-synthesized briefings)
+- ✅ **v0.2.1** — Standup generator
+- ✅ **v0.3** — Tony comes online (line-specific PR review)
+- ✅ **v0.3.1** — Steve comes online (ad-hoc Q&A)
+- ✅ **v0.4** — Memory layer (SQLite), `foreman history`
+- ✅ **v0.5** — `foreman run` always-on daemon (you are here)
+- 🔜 **v0.6** — Jira connector + Nat agent (security/migration triage)
+- 🔜 **v0.7** — Slack connector + Nick agent (real OAuth, not cookie scraping)
+- 🔜 **v0.8** — Memory synthesis: Foreman starts learning your patterns ("you always review @maria's PRs same-day")
+- 🔜 **v0.9** — Prioritization engine ("why this matters" reasons on every alert)
+- 🔜 **v1.0** — Stable, brew-installable, public-launch ready
 
-Beyond v1.0: hosted offering, team intelligence, additional connectors (Linear, PagerDuty, GCal).
+## Privacy & local-first
 
-## Design principles
+- Your GitHub token, Jira token, and Anthropic key live in `.env` on your machine. They never leave.
+- All state (briefings, reviews, history) is stored in a single SQLite file at `~/Library/Application Support/foreman/foreman.db`.
+- LLM calls go directly from your machine to Anthropic — no Foreman-operated server in the middle.
+- No telemetry. No analytics. No "anonymous usage data."
 
-1. **Synthesis over surfacing.** Anyone can list your open PRs. Foreman tells you which one matters.
-2. **Memory is the moat.** The product gets sharper the longer you use it. Episodic + semantic memory of your patterns.
-3. **Specialized agents over a megaprompt.** Each agent has bounded scope and the right tools for its job.
-4. **Local-first.** Your data stays on your machine. SQLite, not a cloud database.
-5. **Terminal-native.** No web dashboard until users beg for one.
-6. **One thing per release.** Ship a working slice; resist the urge to scaffold everything.
+## Contributing
+
+Issues and PRs welcome. The architecture is intentionally pluggable — adding a connector (Linear, Notion, PagerDuty) is one new file in `foreman/connectors/`. Adding an agent is one new file in `foreman/agents/` plus a versioned prompt in `foreman/llm/prompts/`.
+
+If you're a senior engineer who wants Foreman to surface things it doesn't currently, open an issue describing the signal and how you'd want it framed — that drives the roadmap.
 
 ## License
 

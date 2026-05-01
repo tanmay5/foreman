@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 360" font-family="ui-monospace, 'SF Mono', Menlo, Monaco, monospace">
+  <!-- terminal window -->
+  <rect width="820" height="360" rx="10" fill="#0d1117"/>
+
+  <!-- title bar -->
+  <rect width="820" height="34" rx="10" fill="#161b22"/>
+  <rect y="24" width="820" height="10" fill="#161b22"/>
+  <circle cx="20" cy="17" r="6" fill="#ff5f56"/>
+  <circle cx="42" cy="17" r="6" fill="#ffbd2e"/>
+  <circle cx="64" cy="17" r="6" fill="#27c93f"/>
+  <text x="410" y="22" text-anchor="middle" font-size="12" fill="#6B7280">foreman</text>
+
+  <!-- aria panel border -->
+  <rect x="24" y="60" width="772" height="200" rx="8" fill="none" stroke="#10B981" stroke-width="1.5"/>
+
+  <!-- title -->
+  <text x="44" y="92" font-size="16" font-weight="bold" fill="#10B981">FOREMAN</text>
+  <text x="142" y="92" font-size="13" fill="#6B7280">·  always-on chief-of-staff</text>
+
+  <!-- agents list -->
+  <text x="44" y="130" font-size="13" fill="#10B981" font-weight="bold">Aria</text>
+  <text x="120" y="130" font-size="13" fill="#c9d1d9">morning briefings &amp; standups</text>
+
+  <text x="44" y="156" font-size="13" fill="#EF4444" font-weight="bold">Tony</text>
+  <text x="120" y="156" font-size="13" fill="#c9d1d9">PR reviews &amp; line-specific feedback</text>
+
+  <text x="44" y="182" font-size="13" fill="#60A5FA" font-weight="bold">Steve</text>
+  <text x="120" y="182" font-size="13" fill="#c9d1d9">ad-hoc questions, your catch-all engineer</text>
+
+  <!-- footer hint -->
+  <text x="44" y="226" font-size="12" fill="#6B7280">Polling GitHub every 10 min  ·  type help for commands  ·  quit to exit</text>
+
+  <!-- prompt -->
+  <text x="24" y="306" font-size="14" fill="#10B981" font-weight="bold">you ›</text>
+  <text x="80" y="306" font-size="14" fill="#c9d1d9">briefing</text>
+  <rect x="155" y="294" width="9" height="16" fill="#c9d1d9" opacity="0.85"/>
+</svg>

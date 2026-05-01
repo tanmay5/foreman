@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 500" font-family="ui-monospace, 'SF Mono', Menlo, Monaco, monospace">
+  <rect width="820" height="500" rx="10" fill="#0d1117"/>
+
+  <!-- title bar -->
+  <rect width="820" height="34" rx="10" fill="#161b22"/>
+  <rect y="24" width="820" height="10" fill="#161b22"/>
+  <circle cx="20" cy="17" r="6" fill="#ff5f56"/>
+  <circle cx="42" cy="17" r="6" fill="#ffbd2e"/>
+  <circle cx="64" cy="17" r="6" fill="#27c93f"/>
+  <text x="410" y="22" text-anchor="middle" font-size="12" fill="#6B7280">foreman review-pr 312</text>
+
+  <!-- prompt line -->
+  <text x="24" y="64" font-size="13" fill="#10B981" font-weight="bold">you ›</text>
+  <text x="76" y="64" font-size="13" fill="#c9d1d9">review-pr 312</text>
+  <text x="24" y="86" font-size="12" fill="#6B7280">Tony reviewing acme/widgets#312...</text>
+
+  <!-- tony panel -->
+  <rect x="24" y="106" width="772" height="370" rx="8" fill="none" stroke="#EF4444" stroke-width="1.5"/>
+
+  <text x="44" y="134" font-size="14" font-weight="bold" fill="#EF4444">Tony</text>
+  <text x="84" y="134" font-size="13" fill="#6B7280">·  PR REVIEW</text>
+
+  <text x="44" y="166" font-size="13" font-weight="bold" fill="#c9d1d9">PR #312 — Migrate auth service to OAuth 2.1</text>
+  <text x="44" y="186" font-size="12" fill="#6B7280">by @maria  ·  +287 -43  ·  8 files changed</text>
+
+  <text x="44" y="220" font-size="13" font-weight="bold" fill="#c9d1d9">Issues found:</text>
+
+  <text x="44" y="246" font-size="12" fill="#c9d1d9">- auth/oauth_handler.py:42 — token refresh threshold hardcoded to 5 min;</text>
+  <text x="60" y="262" font-size="12" fill="#6B7280">should be a feature flag for staged rollout.</text>
+
+  <text x="44" y="288" font-size="12" fill="#c9d1d9">- auth/oauth_handler.py:89 — no fallback when identity provider times out.</text>
+  <text x="60" y="304" font-size="12" fill="#6B7280">Will surface 500 to client instead of cached token.</text>
+
+  <text x="44" y="330" font-size="12" fill="#c9d1d9">- migrations/0042_oauth.sql — drops legacy_token column with no backfill.</text>
+  <text x="60" y="346" font-size="12" fill="#6B7280">Existing sessions will be invalidated on deploy.</text>
+
+  <text x="44" y="380" font-size="13" font-weight="bold" fill="#10B981">Looks good:</text>
+  <text x="44" y="402" font-size="12" fill="#c9d1d9">- Test coverage for the happy path is thorough.</text>
+
+  <text x="44" y="436" font-size="13" font-weight="bold" fill="#EF4444">Verdict: Request changes</text>
+  <text x="44" y="456" font-size="12" fill="#6B7280">Fix the identity-provider fallback and add a backfill before merge.</text>
+</svg>

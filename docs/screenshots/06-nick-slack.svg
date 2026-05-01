@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 440" font-family="ui-monospace, 'SF Mono', Menlo, Monaco, monospace">
+  <rect width="820" height="440" rx="10" fill="#0d1117"/>
+
+  <!-- title bar -->
+  <rect width="820" height="34" rx="10" fill="#161b22"/>
+  <rect y="24" width="820" height="10" fill="#161b22"/>
+  <circle cx="20" cy="17" r="6" fill="#ff5f56"/>
+  <circle cx="42" cy="17" r="6" fill="#ffbd2e"/>
+  <circle cx="64" cy="17" r="6" fill="#27c93f"/>
+  <text x="410" y="22" text-anchor="middle" font-size="12" fill="#6B7280">foreman briefing</text>
+
+  <!-- nick panel -->
+  <rect x="24" y="56" width="772" height="368" rx="8" fill="none" stroke="#F59E0B" stroke-width="1.5"/>
+
+  <text x="44" y="84" font-size="14" font-weight="bold" fill="#F59E0B">Nick</text>
+  <text x="84" y="84" font-size="13" fill="#6B7280">·  SLACK DIGEST</text>
+
+  <text x="44" y="118" font-size="13" font-weight="bold" fill="#c9d1d9">DMs (2 today)</text>
+
+  <text x="44" y="142" font-size="12" fill="#c9d1d9">from @maria   2h ago</text>
+  <text x="44" y="160" font-size="12" fill="#6B7280">"can you take a look at PR #312 today? blocked on this for the auth migration"</text>
+
+  <text x="44" y="186" font-size="12" fill="#c9d1d9">from @kyle    5h ago</text>
+  <text x="44" y="204" font-size="12" fill="#6B7280">"quick question on the rate-limiter design — is sliding window or token bucket better?"</text>
+
+  <text x="44" y="240" font-size="13" font-weight="bold" fill="#c9d1d9">Mentions (1)</text>
+
+  <text x="44" y="264" font-size="12" fill="#c9d1d9">#engineering   1h ago   from @james</text>
+  <text x="44" y="282" font-size="12" fill="#6B7280">"@octocat how does the new auth flow handle session revocation across regions?"</text>
+
+  <text x="44" y="320" font-size="13" font-weight="bold" fill="#F59E0B">Top priority</text>
+  <text x="44" y="342" font-size="12" fill="#c9d1d9">Reply to @maria. She's blocked on PR review and you usually respond within</text>
+  <text x="44" y="360" font-size="12" fill="#c9d1d9">an hour. @kyle's question is design-level, can wait until afternoon.</text>
+
+  <text x="44" y="394" font-size="12" fill="#6B7280">@james's mention in #engineering is a question, not a blocker. Park it.</text>
+</svg>

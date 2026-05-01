@@ -33,16 +33,26 @@ class Settings(BaseSettings):
     anthropic_api_key: SecretStr | None = Field(None, alias="ANTHROPIC_API_KEY")
     foreman_llm_model: str = Field("claude-sonnet-4-6", alias="FOREMAN_LLM_MODEL")
 
-    # --- Jira (optional until v0.2) ---
+    # --- Linear ---
+    linear_api_key: SecretStr | None = Field(None, alias="LINEAR_API_KEY")
+
+    # --- Jira ---
     jira_base_url: str | None = Field(None, alias="JIRA_BASE_URL")
     jira_email: str | None = Field(None, alias="JIRA_EMAIL")
     jira_api_token: SecretStr | None = Field(None, alias="JIRA_API_TOKEN")
 
-    # --- Slack (optional until v0.3) ---
+    # --- Slack ---
     slack_bot_token: SecretStr | None = Field(None, alias="SLACK_BOT_TOKEN")
     slack_user_token: SecretStr | None = Field(None, alias="SLACK_USER_TOKEN")
     slack_team_id: str | None = Field(None, alias="SLACK_TEAM_ID")
     slack_user_id: str | None = Field(None, alias="SLACK_USER_ID")
+
+    # --- Google Calendar ---
+    google_calendar_token: SecretStr | None = Field(None, alias="GOOGLE_CALENDAR_TOKEN")
+
+    # --- Sentry ---
+    sentry_auth_token: SecretStr | None = Field(None, alias="SENTRY_AUTH_TOKEN")
+    sentry_org_slug: str | None = Field(None, alias="SENTRY_ORG_SLUG")
 
     # --- Scheduler ---
     foreman_briefing_time: str = Field("08:30", alias="FOREMAN_BRIEFING_TIME")

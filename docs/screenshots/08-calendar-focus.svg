@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 380" font-family="ui-monospace, 'SF Mono', Menlo, Monaco, monospace">
+  <rect width="820" height="380" rx="10" fill="#0d1117"/>
+
+  <!-- title bar -->
+  <rect width="820" height="34" rx="10" fill="#161b22"/>
+  <rect y="24" width="820" height="10" fill="#161b22"/>
+  <circle cx="20" cy="17" r="6" fill="#ff5f56"/>
+  <circle cx="42" cy="17" r="6" fill="#ffbd2e"/>
+  <circle cx="64" cy="17" r="6" fill="#27c93f"/>
+  <text x="410" y="22" text-anchor="middle" font-size="12" fill="#6B7280">foreman focus</text>
+
+  <!-- prompt -->
+  <text x="24" y="64" font-size="13" fill="#10B981" font-weight="bold">you ›</text>
+  <text x="76" y="64" font-size="13" fill="#c9d1d9">focus</text>
+
+  <!-- aria panel -->
+  <rect x="24" y="84" width="772" height="280" rx="8" fill="none" stroke="#10B981" stroke-width="1.5"/>
+  <text x="44" y="112" font-size="14" font-weight="bold" fill="#10B981">Aria</text>
+  <text x="84" y="112" font-size="13" fill="#6B7280">·  TIME BUDGET</text>
+
+  <text x="44" y="144" font-size="13" fill="#c9d1d9">You have 3 hours and 12 minutes of focus time before your next meeting.</text>
+
+  <!-- timeline-like representation -->
+  <text x="44" y="184" font-size="12" fill="#10B981" font-weight="bold">Now → 12:45 PM</text>
+  <text x="200" y="184" font-size="12" fill="#c9d1d9">3h 12m  ·  open block, no meetings</text>
+
+  <text x="44" y="208" font-size="12" fill="#F59E0B" font-weight="bold">12:45 → 1:30 PM</text>
+  <text x="200" y="208" font-size="12" fill="#c9d1d9">1:1 with @james</text>
+
+  <text x="44" y="232" font-size="12" fill="#6B7280" font-weight="bold">1:30 → 3:00 PM</text>
+  <text x="200" y="232" font-size="12" fill="#c9d1d9">1h 30m  ·  open</text>
+
+  <text x="44" y="256" font-size="12" fill="#EF4444" font-weight="bold">3:00 → 4:00 PM</text>
+  <text x="200" y="256" font-size="12" fill="#c9d1d9">team standup</text>
+
+  <text x="44" y="280" font-size="12" fill="#6B7280" font-weight="bold">4:00 → 6:00 PM</text>
+  <text x="200" y="280" font-size="12" fill="#c9d1d9">2h  ·  open</text>
+
+  <text x="44" y="324" font-size="13" fill="#c9d1d9" font-weight="bold">Recommendation:</text>
+  <text x="44" y="346" font-size="12" fill="#c9d1d9">Use the next 3h block for AUTH-892 — it needs uninterrupted thinking. Save the</text>
+  <text x="44" y="362" font-size="12" fill="#c9d1d9">afternoon shorter blocks for PR review and Slack catch-up.</text>
+</svg>

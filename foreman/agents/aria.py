@@ -17,6 +17,7 @@ from typing import Any
 
 from foreman.agents.base import Agent
 from foreman.connectors.github import PR
+from foreman.connectors.linear import Issue
 
 
 class Aria(Agent):
@@ -30,16 +31,18 @@ class Aria(Agent):
         user_name: str,
         review_prs: list[PR],
         my_open_prs: list[PR],
+        open_tickets: list[Issue] | None = None,
     ) -> str:
-        """Produce a short prose briefing from structured PR data."""
+        """Produce a short prose briefing across PRs and tickets."""
         system = self._load_prompt()
         payload = {
             "user_name": user_name,
             "today": datetime.now().date().isoformat(),
             "review_requested": [_pr_summary(p) for p in review_prs],
             "my_open_prs": [_pr_summary(p) for p in my_open_prs],
+            "open_tickets": [_issue_summary(i) for i in (open_tickets or [])],
         }
-        return await self._llm.ask(system, json.dumps(payload, indent=2), max_tokens=500)
+        return await self._llm.ask(system, json.dumps(payload, indent=2), max_tokens=600)
 
     async def synthesize_standup(
         self,
@@ -74,8 +77,21 @@ def _pr_summary(pr: PR) -> dict[str, Any]:
 
 
 def _age_days(iso_ts: str) -> int:
+    if not iso_ts:
+        return 0
     try:
         dt = datetime.fromisoformat(iso_ts.replace("Z", "+00:00"))
     except ValueError:
         return 0
     return max(0, (datetime.now(timezone.utc) - dt).days)
+
+
+def _issue_summary(issue: Issue) -> dict[str, Any]:
+    return {
+        "identifier": issue.identifier,
+        "title": issue.title,
+        "state": issue.state,
+        "priority_label": issue.priority_label,
+        "labels": issue.labels,
+        "age_days": _age_days(issue.created_at),
+    }

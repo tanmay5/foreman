@@ -19,10 +19,12 @@ from rich.panel import Panel
 from rich.text import Text
 
 from foreman.agents.aria import Aria
+from foreman.agents.nat import Nat
 from foreman.agents.steve import Steve
 from foreman.agents.tony import Tony
 from foreman.config import Settings
 from foreman.connectors.github import GitHubConnector, GitHubError, PR
+from foreman.connectors.linear import Issue, LinearConnector, LinearError
 from foreman.core.db import Database
 from foreman.llm.client import LLMClient, LLMError
 from foreman.ui.notifier import notify
@@ -32,9 +34,10 @@ console = Console()
 
 HELP_TEXT = """
 Commands:
-  briefing            Aria's morning briefing
+  briefing            Aria's morning briefing (cross-source)
   standup             Aria's standup notes
   review-pr <n>       Tony reviews PR #n (auto-detects repo)
+  triage <id>         Nat triages a Linear ticket (e.g. ABC-123)
   history [n]         Recent agent activity (default 10)
   help                This list
   quit / exit         Stop the daemon
@@ -147,6 +150,8 @@ async def _dispatch(cmd: str, settings: Settings, db: Database) -> None:
             console.print(f"[red]Bad PR number: {parts[1]}[/red]")
             return
         await _run_review(settings, db, num)
+    elif head == "triage" and len(parts) >= 2:
+        await _run_triage(settings, db, parts[1])
     elif head == "history":
         n = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 10
         _show_history(db, n)
@@ -166,19 +171,29 @@ async def _run_briefing(settings: Settings, db: Database) -> None:
         except GitHubError as e:
             console.print(f"[red]GitHub error:[/red] {e}")
             return
+
+    open_tickets: list[Issue] = []
+    if settings.linear_api_key is not None:
+        try:
+            async with LinearConnector(settings) as linear:
+                open_tickets = await linear.poll_my_open_issues()
+        except LinearError:
+            pass
+
     async with LLMClient(settings) as llm:
         try:
             text = await Aria(llm).synthesize_briefing(
                 user_name=settings.github_user,
                 review_prs=review,
                 my_open_prs=mine,
+                open_tickets=open_tickets,
             )
         except LLMError as e:
             console.print(f"[red]Aria failed:[/red] {e}")
             return
     _agent_panel("Aria", "BRIEFING", text, AGENT_COLORS["aria"])
     db.log_event(kind="briefing", agent="aria",
-                 input_summary=f"review={len(review)} open={len(mine)}",
+                 input_summary=f"review={len(review)} open={len(mine)} tickets={len(open_tickets)}",
                  output=text, meta={"model": settings.foreman_llm_model})
 
 
@@ -232,6 +247,32 @@ async def _run_review(settings: Settings, db: Database, number: int) -> None:
     _agent_panel("Tony", "PR REVIEW", text, AGENT_COLORS["tony"])
     db.log_event(kind="review", agent="tony",
                  input_summary=f"{repo}#{number}", output=text,
+                 meta={"model": settings.foreman_llm_model})
+
+
+async def _run_triage(settings: Settings, db: Database, identifier: str) -> None:
+    if settings.linear_api_key is None:
+        console.print(f"[red]LINEAR_API_KEY not set.[/red]")
+        return
+    try:
+        async with LinearConnector(settings) as linear:
+            issue = await linear.get_issue(identifier)
+    except LinearError as e:
+        console.print(f"[red]Linear error:[/red] {e}")
+        return
+    if issue is None:
+        console.print(f"[red]Ticket {identifier} not found.[/red]")
+        return
+    console.print(f"[{DIM}]Nat triaging {identifier}...[/]")
+    async with LLMClient(settings) as llm:
+        try:
+            text = await Nat(llm).triage_issue(issue)
+        except LLMError as e:
+            console.print(f"[red]Nat failed:[/red] {e}")
+            return
+    _agent_panel("Nat", "TICKET TRIAGE", text, AGENT_COLORS["nat"])
+    db.log_event(kind="triage", agent="nat",
+                 input_summary=identifier, output=text,
                  meta={"model": settings.foreman_llm_model})
 
 

@@ -24,6 +24,7 @@ from foreman import __version__
 from foreman.agents.aria import Aria
 from foreman.config import Settings, load_settings
 from foreman.connectors.github import GitHubConnector, GitHubError, PR
+from foreman.connectors.linear import Issue, LinearConnector, LinearError
 from foreman.core.db import Database
 from foreman.llm.client import LLMClient, LLMError
 from foreman.ui.theme import AGENT_COLORS, DIM
@@ -57,7 +58,7 @@ def briefing() -> None:
 async def _briefing(settings: Settings) -> None:
     _render_header()
 
-    # 1. Fetch GitHub state
+    # 1. Fetch state across configured sources
     async with GitHubConnector(settings) as gh:
         try:
             review_prs, my_prs = await asyncio.gather(
@@ -69,10 +70,19 @@ async def _briefing(settings: Settings) -> None:
             console.print(f"[{DIM}]Run `foreman doctor` to verify your token.[/]")
             raise typer.Exit(code=1) from e
 
+    open_tickets: list[Issue] = []
+    if settings.linear_api_key is not None:
+        try:
+            async with LinearConnector(settings) as linear:
+                open_tickets = await linear.poll_my_open_issues()
+        except LinearError as e:
+            console.print(f"[{DIM}]Linear unavailable ({e}).[/]")
+
     aria_color = AGENT_COLORS["aria"]
     tony_color = AGENT_COLORS["tony"]
+    nat_color = AGENT_COLORS["nat"]
 
-    # 2. Aria synthesizes (if LLM is configured); else fall back to a templated line.
+    # 2. Aria synthesizes across sources.
     narrative: str | None = None
     if settings.anthropic_api_key is not None:
         try:
@@ -82,6 +92,7 @@ async def _briefing(settings: Settings) -> None:
                     user_name=settings.github_user,
                     review_prs=review_prs,
                     my_open_prs=my_prs,
+                    open_tickets=open_tickets,
                 )
             _render_aria_panel(narrative, aria_color)
         except LLMError as e:
@@ -95,7 +106,7 @@ async def _briefing(settings: Settings) -> None:
         Database(settings.db_path).log_event(
             kind="briefing",
             agent="aria",
-            input_summary=f"review={len(review_prs)} open={len(my_prs)}",
+            input_summary=f"review={len(review_prs)} open={len(my_prs)} tickets={len(open_tickets)}",
             output=narrative,
             meta={"model": settings.foreman_llm_model},
         )
@@ -112,6 +123,10 @@ async def _briefing(settings: Settings) -> None:
         console.print(_pr_table(f"Your open PRs ({len(my_prs)})", my_prs, aria_color))
     else:
         console.print(f"[{DIM}]You have no open PRs.[/{DIM}]")
+
+    if open_tickets:
+        console.print()
+        console.print(_ticket_table(f"Your open tickets ({len(open_tickets)})", open_tickets, nat_color))
 
     console.print()
 
@@ -188,6 +203,36 @@ def _pr_table(title: str, prs: list[PR], color: str) -> Table:
     return table
 
 
+def _ticket_table(title: str, tickets: list[Issue], color: str) -> Table:
+    table = Table(
+        title=title,
+        title_style=f"bold {color}",
+        title_justify="left",
+        show_header=True,
+        header_style=f"bold {DIM}",
+        box=box.SIMPLE,
+        padding=(0, 1),
+    )
+    table.add_column("ID", style="bold", no_wrap=True)
+    table.add_column("State", style=DIM, no_wrap=True)
+    table.add_column("Title", overflow="fold")
+    table.add_column("Priority", style=DIM, no_wrap=True)
+    table.add_column("Labels", style=DIM, overflow="fold")
+
+    for t in tickets:
+        labels_disp = ", ".join(t.labels[:3])
+        if len(t.labels) > 3:
+            labels_disp += f" +{len(t.labels) - 3}"
+        table.add_row(
+            t.identifier,
+            t.state,
+            t.title,
+            t.priority_label or "",
+            labels_disp,
+        )
+    return table
+
+
 def _humanize_age(iso_ts: str) -> str:
     try:
         dt = datetime.fromisoformat(iso_ts.replace("Z", "+00:00"))
@@ -258,10 +303,28 @@ async def _doctor(settings: Settings) -> None:
         except LLMError as e:
             console.print(f"  [red]✗[/] anthropic  {e}")
 
+    # Linear
+    if settings.linear_api_key is None:
+        console.print(f"  [{DIM}]· linear     not configured (LINEAR_API_KEY)[/]")
+    else:
+        try:
+            async with LinearConnector(settings) as linear:
+                lr = await linear.health_check()
+            if lr.get("ok"):
+                console.print(f"  [green]✓[/] linear     user={lr.get('user')}")
+            else:
+                console.print(f"  [red]✗[/] linear     {lr.get('error', '')}")
+        except Exception as e:
+            console.print(f"  [red]✗[/] linear     {e}")
+
     if settings.jira_api_token is None:
-        console.print(f"  [{DIM}]· jira       not configured (required from v0.3)[/]")
+        console.print(f"  [{DIM}]· jira       not configured (connector lands in a future release)[/]")
     if settings.slack_bot_token is None:
-        console.print(f"  [{DIM}]· slack      not configured (required from v0.3)[/]")
+        console.print(f"  [{DIM}]· slack      not configured (connector lands in a future release)[/]")
+    if settings.google_calendar_token is None:
+        console.print(f"  [{DIM}]· calendar   not configured (connector lands in a future release)[/]")
+    if settings.sentry_auth_token is None:
+        console.print(f"  [{DIM}]· sentry     not configured (connector lands in a future release)[/]")
 
 
 # --- stubs (later versions) ---------------------------------------------------
@@ -365,9 +428,71 @@ async def _review_pr(settings: Settings, number: int, repo: str | None) -> None:
 
 
 @app.command()
+def triage(identifier: str = typer.Argument(..., help="Linear identifier, e.g. ABC-123")) -> None:
+    """Have Nat triage a Linear ticket by identifier."""
+    try:
+        settings = load_settings()
+    except Exception as e:
+        console.print(f"[red]Config error:[/red] {e}")
+        raise typer.Exit(code=2)
+    if settings.anthropic_api_key is None:
+        console.print(f"[red]triage needs ANTHROPIC_API_KEY.[/red]")
+        raise typer.Exit(code=2)
+    if settings.linear_api_key is None:
+        console.print(f"[red]triage needs LINEAR_API_KEY.[/red] Get one at https://linear.app/settings/account/security")
+        raise typer.Exit(code=2)
+    asyncio.run(_triage(settings, identifier))
+
+
+async def _triage(settings: Settings, identifier: str) -> None:
+    from foreman.agents.nat import Nat
+    _render_header()
+    try:
+        async with LinearConnector(settings) as linear:
+            issue = await linear.get_issue(identifier)
+    except LinearError as e:
+        console.print(f"[red]Linear error:[/red] {e}")
+        raise typer.Exit(code=1) from e
+
+    if issue is None:
+        console.print(f"[red]Ticket {identifier} not found.[/red]")
+        raise typer.Exit(code=1)
+
+    console.print(f"[{DIM}]Nat triaging {identifier}...[/]\n")
+    async with LLMClient(settings) as llm:
+        try:
+            text = await Nat(llm).triage_issue(issue)
+        except LLMError as e:
+            console.print(f"[red]Nat failed:[/red] {e}")
+            raise typer.Exit(code=1) from e
+
+    color = AGENT_COLORS["nat"]
+    title = Text()
+    title.append("Nat", style=f"bold {color}")
+    title.append("  ·  ", style=DIM)
+    title.append("TICKET TRIAGE", style=DIM)
+    console.print(
+        Panel(
+            text.strip(),
+            title=title,
+            title_align="left",
+            border_style=color,
+            box=box.ROUNDED,
+            padding=(1, 2),
+        )
+    )
+
+    Database(settings.db_path).log_event(
+        kind="triage", agent="nat",
+        input_summary=identifier, output=text,
+        meta={"model": settings.foreman_llm_model},
+    )
+
+
+@app.command()
 def jira(key: str) -> None:
-    """Have Nat analyze a Jira ticket by key."""
-    console.print(f"[{DIM}]Not implemented yet (v0.3 — Nat comes online).[/]")
+    """[Stub] Jira triage. Lands when JIRA_API_TOKEN integration ships."""
+    console.print(f"[{DIM}]Jira connector not yet implemented. Linear is supported via `foreman triage`.[/]")
     raise typer.Exit(code=1)
 
 

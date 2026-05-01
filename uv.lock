@@ -117,8 +117,8 @@ wheels = [
 ]
 
 [[package]]
-name = "foreman"
-version = "0.0.1"
+name = "foreman-cli"
+version = "0.5.1"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },

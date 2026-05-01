@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/status-alpha-orange.svg)](#roadmap)
 
-![Foreman banner](https://raw.githubusercontent.com/tanmay5/foreman/main/docs/screenshots/01-banner.svg)
+![Foreman banner](docs/screenshots/01-banner.svg)
 
 ---
 
@@ -24,7 +24,7 @@ It runs locally. Your data never leaves your machine.
 
 Every time you start your day, ask once. Aria reads your live GitHub state and tells you what actually matters today, with a concrete first action.
 
-![Briefing](https://raw.githubusercontent.com/tanmay5/foreman/main/docs/screenshots/02-briefing.svg)
+![Briefing](docs/screenshots/02-briefing.svg)
 
 This isn't a templated digest. The narrative is generated each run from your real state — PRs awaiting your review, your own open work, ages, blocking signals.
 
@@ -32,7 +32,7 @@ This isn't a templated digest. The narrative is generated each run from your rea
 
 Tony reads the unified diff and produces a focused review with file:line references, prioritized by what actually breaks production: bugs, missing error handling, security, breaking API changes, missing tests.
 
-![PR Review](https://raw.githubusercontent.com/tanmay5/foreman/main/docs/screenshots/03-review.svg)
+![PR Review](docs/screenshots/03-review.svg)
 
 You stay in the loop. Tony tees up the context so you're not starting cold.
 
@@ -40,7 +40,7 @@ You stay in the loop. Tony tees up the context so you're not starting cold.
 
 Steve has read access to your live GitHub state. Senior-engineer voice, no fluff, gives a recommendation not options.
 
-![Ask](https://raw.githubusercontent.com/tanmay5/foreman/main/docs/screenshots/04-ask.svg)
+![Ask](docs/screenshots/04-ask.svg)
 
 ## Meet the team
 

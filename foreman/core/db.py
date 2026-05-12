@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +34,15 @@ CREATE TABLE IF NOT EXISTS seen_items (
     first_seen TEXT NOT NULL,
     PRIMARY KEY (source, item_id)
 );
+
+CREATE TABLE IF NOT EXISTS memory_patterns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pattern TEXT NOT NULL,
+    evidence_summary TEXT,
+    created_at TEXT NOT NULL,
+    superseded_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_patterns_active ON memory_patterns(superseded_at);
 """
 
 
@@ -97,3 +106,45 @@ class Database:
                 "INSERT OR IGNORE INTO seen_items (source, item_id, first_seen) VALUES (?, ?, ?)",
                 [(source, i, ts) for i in item_ids],
             )
+
+    def recent_events_for_synthesis(self, days: int = 14, limit: int = 200) -> list[dict[str, Any]]:
+        """Pull recent events (kind, agent, input_summary, output) for memory synthesis."""
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        with self._conn() as c:
+            c.row_factory = sqlite3.Row
+            rows = c.execute(
+                "SELECT ts, kind, agent, input_summary, output FROM events "
+                "WHERE ts >= ? ORDER BY ts DESC LIMIT ?",
+                (cutoff, limit),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def active_patterns(self) -> list[dict[str, Any]]:
+        with self._conn() as c:
+            c.row_factory = sqlite3.Row
+            rows = c.execute(
+                "SELECT id, pattern, evidence_summary, created_at FROM memory_patterns "
+                "WHERE superseded_at IS NULL ORDER BY created_at DESC"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def supersede_all_patterns(self) -> None:
+        ts = datetime.now(timezone.utc).isoformat()
+        with self._conn() as c:
+            c.execute(
+                "UPDATE memory_patterns SET superseded_at = ? WHERE superseded_at IS NULL",
+                (ts,),
+            )
+
+    def add_patterns(self, patterns: list[dict[str, str]]) -> int:
+        """patterns is a list of {pattern, evidence_summary} dicts."""
+        if not patterns:
+            return 0
+        ts = datetime.now(timezone.utc).isoformat()
+        rows = [(p.get("pattern", ""), p.get("evidence_summary", ""), ts) for p in patterns]
+        with self._conn() as c:
+            c.executemany(
+                "INSERT INTO memory_patterns (pattern, evidence_summary, created_at) VALUES (?, ?, ?)",
+                rows,
+            )
+        return len(rows)

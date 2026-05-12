@@ -24,9 +24,11 @@ from foreman import __version__
 from foreman.agents.aria import Aria
 from foreman.config import Settings, load_settings
 from foreman.connectors.github import GitHubConnector, GitHubError, PR
+from foreman.connectors.jira import JiraConnector, JiraError, JiraIssue
 from foreman.connectors.linear import Issue, LinearConnector, LinearError
 from foreman.connectors.slack import Message, SlackConnector, SlackError
 from foreman.core.db import Database
+from foreman.core.synthesis import SynthesisError, synthesize_memory
 from foreman.llm.client import LLMClient, LLMError
 from foreman.ui.theme import AGENT_COLORS, DIM
 
@@ -71,13 +73,30 @@ async def _briefing(settings: Settings) -> None:
             console.print(f"[{DIM}]Run `foreman doctor` to verify your token.[/]")
             raise typer.Exit(code=1) from e
 
-    open_tickets: list[Issue] = []
+    open_tickets: list[Issue | JiraIssue] = []
     if settings.linear_api_key is not None:
         try:
             async with LinearConnector(settings) as linear:
-                open_tickets = await linear.poll_my_open_issues()
+                open_tickets.extend(await linear.poll_my_open_issues())
         except LinearError as e:
             console.print(f"[{DIM}]Linear unavailable ({e}).[/]")
+    if settings.jira_api_token is not None:
+        try:
+            async with JiraConnector(settings) as jira:
+                open_tickets.extend(await jira.poll_my_open_issues())
+        except JiraError as e:
+            console.print(f"[{DIM}]Jira unavailable ({e}).[/]")
+
+    recent_dms: list[Message] = []
+    if settings.slack_user_token is not None:
+        try:
+            async with SlackConnector(settings) as slack:
+                recent_dms = await slack.poll_recent_dms(hours=24, limit=10)
+        except SlackError:
+            pass
+
+    db = Database(settings.db_path)
+    learned_patterns = db.active_patterns()
 
     aria_color = AGENT_COLORS["aria"]
     tony_color = AGENT_COLORS["tony"]
@@ -94,6 +113,8 @@ async def _briefing(settings: Settings) -> None:
                     review_prs=review_prs,
                     my_open_prs=my_prs,
                     open_tickets=open_tickets,
+                    recent_dms=recent_dms,
+                    learned_patterns=learned_patterns,
                 )
             _render_aria_panel(narrative, aria_color)
         except LLMError as e:
@@ -104,10 +125,13 @@ async def _briefing(settings: Settings) -> None:
 
     # 2b. Log to memory.
     if narrative is not None:
-        Database(settings.db_path).log_event(
+        db.log_event(
             kind="briefing",
             agent="aria",
-            input_summary=f"review={len(review_prs)} open={len(my_prs)} tickets={len(open_tickets)}",
+            input_summary=(
+                f"review={len(review_prs)} open={len(my_prs)} "
+                f"tickets={len(open_tickets)} dms={len(recent_dms)} patterns={len(learned_patterns)}"
+            ),
             output=narrative,
             meta={"model": settings.foreman_llm_model},
         )
@@ -318,8 +342,19 @@ async def _doctor(settings: Settings) -> None:
         except Exception as e:
             console.print(f"  [red]✗[/] linear     {e}")
 
+    # Jira
     if settings.jira_api_token is None:
-        console.print(f"  [{DIM}]· jira       not configured (connector lands in a future release)[/]")
+        console.print(f"  [{DIM}]· jira       not configured (JIRA_BASE_URL + JIRA_EMAIL + JIRA_API_TOKEN)[/]")
+    else:
+        try:
+            async with JiraConnector(settings) as jira:
+                jr = await jira.health_check()
+            if jr.get("ok"):
+                console.print(f"  [green]✓[/] jira       user={jr.get('user')}")
+            else:
+                console.print(f"  [red]✗[/] jira       {jr.get('error', '')}")
+        except Exception as e:
+            console.print(f"  [red]✗[/] jira       {e}")
     # Slack
     if settings.slack_user_token is None:
         console.print(f"  [{DIM}]· slack      not configured (SLACK_USER_TOKEN)[/]")
@@ -440,8 +475,8 @@ async def _review_pr(settings: Settings, number: int, repo: str | None) -> None:
 
 
 @app.command()
-def triage(identifier: str = typer.Argument(..., help="Linear identifier, e.g. ABC-123")) -> None:
-    """Have Nat triage a Linear ticket by identifier."""
+def triage(identifier: str = typer.Argument(..., help="Linear or Jira identifier, e.g. ABC-123")) -> None:
+    """Have Nat triage a Linear or Jira ticket. Auto-detects source."""
     try:
         settings = load_settings()
     except Exception as e:
@@ -450,8 +485,8 @@ def triage(identifier: str = typer.Argument(..., help="Linear identifier, e.g. A
     if settings.anthropic_api_key is None:
         console.print(f"[red]triage needs ANTHROPIC_API_KEY.[/red]")
         raise typer.Exit(code=2)
-    if settings.linear_api_key is None:
-        console.print(f"[red]triage needs LINEAR_API_KEY.[/red] Get one at https://linear.app/settings/account/security")
+    if settings.linear_api_key is None and settings.jira_api_token is None:
+        console.print(f"[red]triage needs LINEAR_API_KEY or Jira credentials.[/red]")
         raise typer.Exit(code=2)
     asyncio.run(_triage(settings, identifier))
 
@@ -459,16 +494,36 @@ def triage(identifier: str = typer.Argument(..., help="Linear identifier, e.g. A
 async def _triage(settings: Settings, identifier: str) -> None:
     from foreman.agents.nat import Nat
     _render_header()
-    try:
-        async with LinearConnector(settings) as linear:
-            issue = await linear.get_issue(identifier)
-    except LinearError as e:
-        console.print(f"[red]Linear error:[/red] {e}")
-        raise typer.Exit(code=1) from e
+    issue: Issue | JiraIssue | None = None
+    source = ""
+
+    # Try Linear first if configured
+    if settings.linear_api_key is not None:
+        try:
+            async with LinearConnector(settings) as linear:
+                found = await linear.get_issue(identifier)
+                if found is not None:
+                    issue = found
+                    source = "linear"
+        except LinearError:
+            pass
+
+    # Fall back to Jira if not found in Linear
+    if issue is None and settings.jira_api_token is not None:
+        try:
+            async with JiraConnector(settings) as jira:
+                found = await jira.get_issue(identifier)
+                if found is not None:
+                    issue = found
+                    source = "jira"
+        except JiraError as e:
+            console.print(f"[{DIM}]Jira lookup failed: {e}[/]")
 
     if issue is None:
-        console.print(f"[red]Ticket {identifier} not found.[/red]")
+        console.print(f"[red]Ticket {identifier} not found in Linear or Jira.[/red]")
         raise typer.Exit(code=1)
+
+    console.print(f"[{DIM}]Found in {source}.[/]")
 
     console.print(f"[{DIM}]Nat triaging {identifier}...[/]\n")
     async with LLMClient(settings) as llm:
@@ -563,10 +618,58 @@ async def _digest(settings: Settings) -> None:
 
 
 @app.command()
+def learn(
+    days: int = typer.Option(14, "--days", "-d", help="How many days of activity to synthesize from"),
+) -> None:
+    """Run a memory synthesis pass. Extracts patterns about how you work from your activity log."""
+    try:
+        settings = load_settings()
+    except Exception as e:
+        console.print(f"[red]Config error:[/red] {e}")
+        raise typer.Exit(code=2)
+    if settings.anthropic_api_key is None:
+        console.print(f"[red]learn needs ANTHROPIC_API_KEY.[/red]")
+        raise typer.Exit(code=2)
+    asyncio.run(_learn(settings, days))
+
+
+async def _learn(settings: Settings, days: int) -> None:
+    _render_header()
+    db = Database(settings.db_path)
+    console.print(f"\n[{DIM}]Reading last {days} days of activity, synthesizing patterns...[/]\n")
+    try:
+        result = await synthesize_memory(settings, db, days=days)
+    except SynthesisError as e:
+        console.print(f"[red]Synthesis failed:[/red] {e}")
+        raise typer.Exit(code=1) from e
+
+    color = AGENT_COLORS["aria"]
+    if result["events_seen"] == 0:
+        console.print(f"[{DIM}]No events in the last {days} days. Use foreman briefing/standup/review-pr/ask first to build a log.[/]")
+        return
+
+    console.print(f"  Events analyzed:    {result['events_seen']}")
+    console.print(f"  Patterns extracted: {result['patterns_extracted']}")
+    console.print(f"  Patterns kept:      {result['patterns_kept']}")
+    console.print()
+
+    patterns = db.active_patterns()
+    if patterns:
+        console.print(f"[bold {color}]Learned patterns:[/]")
+        for p in patterns:
+            console.print(f"  · {p['pattern']}")
+            if p.get("evidence_summary"):
+                console.print(f"    [{DIM}]{p['evidence_summary']}[/]")
+        console.print()
+        console.print(f"[{DIM}]These now feed every briefing. Run again any time to refresh.[/]")
+    else:
+        console.print(f"[{DIM}]No patterns extracted. Try again after more activity.[/]")
+
+
+@app.command()
 def jira(key: str) -> None:
-    """[Stub] Jira triage. Lands when JIRA_API_TOKEN integration ships."""
-    console.print(f"[{DIM}]Jira connector not yet implemented. Linear is supported via `foreman triage`.[/]")
-    raise typer.Exit(code=1)
+    """Alias for `triage` (Jira keys auto-detected)."""
+    triage(identifier=key)
 
 
 @app.command()
